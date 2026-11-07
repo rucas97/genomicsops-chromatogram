@@ -18,14 +18,13 @@ object Ab1Parser {
             val bytes = inputStream.readBytes()
             val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
             
-            // AB1 files start with "ABIF"
             val magic = ByteArray(4)
             buffer.get(magic)
             if (String(magic) != "ABIF") return null
             
             buffer.getShort() // version
             buffer.getInt() // unused
-            val dirOffset = buffer.getInt() // Offset to directory
+            val dirOffset = buffer.getInt() 
             buffer.getInt() // unused
             
             buffer.position(dirOffset)
@@ -37,7 +36,7 @@ object Ab1Parser {
             var traceG = IntArray(0)
             var traceT = IntArray(0)
 
-            val directory = mutableMapOf<String, Pair<Int, Int>>() // TagName -> (Length, DataOffset)
+            val directory = mutableMapOf<String, Pair<Int, Int>>() 
             
             for (i in 0 until entryCount) {
                 val nameBytes = ByteArray(4)
@@ -48,11 +47,11 @@ object Ab1Parser {
                 buffer.getShort() // element length
                 val dataLen = buffer.getInt()
                 val dataOffset = buffer.getInt()
+                buffer.getInt() // FIX: Skip the 4-byte DataHandle to align the pointer!
                 
                 directory["$name$tagNumber"] = Pair(dataLen, dataOffset)
             }
             
-            // Extract Base Calls (PBAS 9)
             directory["PBAS9"]?.let { (len, offset) ->
                 buffer.position(offset)
                 val b = ByteArray(len)
@@ -60,7 +59,6 @@ object Ab1Parser {
                 bases = String(b)
             }
             
-            // Extract Traces (DATA 9, 10, 11, 12 often represent A, C, G, T)
             fun getTrace(key: String): IntArray {
                 val (len, offset) = directory[key] ?: return IntArray(0)
                 buffer.position(offset)
