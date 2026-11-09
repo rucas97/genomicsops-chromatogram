@@ -132,11 +132,11 @@ fun AppRoot() {
                                 if (trace.isEmpty()) return
                                 val path = Path()
                                 
-                                // Apply a 5-point moving average to smooth the jagged raw data
+                                // 1. DYNAMIC SMOOTHING: Scale window based on data density
+                                val window = (trace.size / 100).coerceAtLeast(10)
                                 val smoothedTrace = IntArray(trace.size)
-                                val window = 5
                                 for (i in trace.indices) {
-                                    var sum = 0
+                                    var sum = 0L
                                     var count = 0
                                     for (j in -window..window) {
                                         val idx = i + j
@@ -145,21 +145,33 @@ fun AppRoot() {
                                             count++
                                         }
                                     }
-                                    smoothedTrace[i] = sum / count
+                                    smoothedTrace[i] = (sum / count).toInt()
                                 }
 
-                                // Map the smoothed points to the screen width
-                                for (i in smoothedTrace.indices) {
+                                // 2. BEZIER CURVES: Draw smooth curves between points
+                                var prevX = 0f
+                                var prevY = 0f
+                                for (i in smoothedTrace.indices step window) {
                                     val x = (i.toFloat() / smoothedTrace.size) * size.width
                                     val y = size.height - ((smoothedTrace[i] / maxVal) * (size.height * 0.8f)) - (size.height * 0.1f)
-                                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                    
+                                    if (i == 0) {
+                                        path.moveTo(x, y)
+                                    } else {
+                                        // Midpoint for smooth bezier joining
+                                        val midX = (prevX + x) / 2
+                                        path.quadraticBezierTo(prevX, prevY, midX, (prevY + y) / 2)
+                                        path.quadraticBezierTo(x, y, x, y)
+                                    }
+                                    prevX = x
+                                    prevY = y
                                 }
                                 
                                 drawPath(
                                     path, 
                                     color = color, 
                                     style = Stroke(
-                                        width = 4f, // Thicker line for smoothness
+                                        width = 4f,
                                         cap = StrokeCap.Round, 
                                         join = StrokeJoin.Round
                                     )
