@@ -9,7 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
@@ -18,11 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.genomicsops.chromatogram.mol.Ab1Parser
@@ -60,7 +65,7 @@ fun AppRoot() {
                         } catch (e: Exception) { null }
                     }
                     if (parsed == null) {
-                        Toast.makeText(context, "Could not find DNA sequence in file.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Invalid .ab1 file.", Toast.LENGTH_LONG).show()
                     } else {
                         chromatogram = parsed
                         fileName = uri.lastPathSegment?.substringAfterLast("/") ?: "Loaded .ab1"
@@ -86,44 +91,80 @@ fun AppRoot() {
                     Text("Tap the folder icon to load a real .ab1 file", color = GenomicsMuted)
                 }
             } else {
-                Surface(color = GenomicsSurface, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().height(350.dp)) {
-                    Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                        val width = size.width
-                        val height = size.height
-                        val cg = chromatogram!!
-                        
-                        fun drawTrace(trace: IntArray, color: Color) {
-                            if (trace.isEmpty()) return
-                            val path = Path()
-                            val maxVal = trace.maxOrNull()?.toFloat() ?: 1f
-                            
-                            // FIX: Downsample the data so we don't draw a solid block of lines
-                            val step = (trace.size / width).toInt().coerceAtLeast(1)
-                            
-                            for (i in 0 until trace.size step step) {
-                                val x = (i.toFloat() / trace.size) * width
-                                val y = height - ((trace[i] / maxVal) * height * 0.8f) - (height * 0.1f)
-                                
-                                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                val scrollState = rememberScrollState()
+                val bases = chromatogram!!.bases
+                val baseWidth = 12.dp // Width of 1 base letter on screen
+                val totalWidth = (bases.length * baseWidth.value).dp
+
+                Column(Modifier.fillMaxSize().horizontalScroll(scrollState)) {
+                    
+                    // 1. The Trace Canvas
+                    Surface(
+                        color = GenomicsSurface, 
+                        shape = RoundedCornerShape(8.dp), 
+                        modifier = Modifier.width(totalWidth).height(250.dp)
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val maxVal = maxOf(
+                                chromatogram!!.traceA.maxOrNull() ?: 1,
+                                chromatogram!!.traceC.maxOrNull() ?: 1,
+                                chromatogram!!.traceG.maxOrNull() ?: 1,
+                                chromatogram!!.traceT.maxOrNull() ?: 1
+                            ).toFloat()
+
+                            fun drawTrace(trace: IntArray, color: Color) {
+                                if (trace.isEmpty()) return
+                                val path = Path()
+                                // Map the trace points to the screen width
+                                for (i in trace.indices) {
+                                    val x = (i.toFloat() / trace.size) * size.width
+                                    val y = size.height - ((trace[i] / maxVal) * size.height * 0.9f) - (size.height * 0.05f)
+                                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                }
+                                drawPath(path, color = color, style = Stroke(width = 2.5f))
                             }
                             
-                            // FIX: Use anti-aliasing and smoother strokes
-                            drawPath(
-                                path = path, 
-                                color = color, 
-                                style = Stroke(width = 2.5f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
-                            )
+                            // Draw the 4 traces
+                            drawTrace(chromatogram!!.traceA, Color(0xFF00FF00)) // A = Green
+                            drawTrace(chromatogram!!.traceC, Color(0xFF0000FF)) // C = Blue
+                            drawTrace(chromatogram!!.traceG, Color(0xFF808080)) // G = Black/Grey
+                            drawTrace(chromatogram!!.traceT, Color(0xFFFF0000)) // T = Red
                         }
-                        
-                        drawTrace(cg.traceA, Color.Green)
-                        drawTrace(cg.traceC, Color.Blue)
-                        drawTrace(cg.traceG, Color.DarkGray)
-                        drawTrace(cg.traceT, Color.Red)
                     }
+                    Spacer(Modifier.height(8.dp))
+
+                    // 2. The Base Call Strip
+                    Surface(
+                        color = GenomicsSurface, 
+                        shape = RoundedCornerShape(8.dp), 
+                        modifier = Modifier.width(totalWidth).height(40.dp)
+                    ) {
+                        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                            bases.forEach { base ->
+                                Text(
+                                    text = base.toString(),
+                                    color = when(base) {
+                                        'A' -> Color(0xFF00FF00)
+                                        'C' -> Color(0xFF0000FF)
+                                        'G' -> Color(0xFF808080)
+                                        'T' -> Color(0xFFFF0000)
+                                        else -> Color.White
+                                    },
+                                    fontSize = 14.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.width(baseWidth)
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    // 3. Text summary
+                    Text("Total Bases: ${bases.length}", color = GenomicsMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
                 }
-                Spacer(Modifier.height(16.dp))
-                Text("Base Calls:", color = GenomicsMuted, fontSize = 12.sp)
-                Text(chromatogram!!.bases.take(150), color = GenomicsCyan, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             }
         }
     }
