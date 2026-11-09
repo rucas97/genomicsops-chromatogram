@@ -41,16 +41,16 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppRoot() {
-    var var showSplash by remember { by rememberSaveable { mutableStateOf(true) }
+    var showSplash by rememberSaveable { mutableStateOf(true) }
     if (showSplash) SplashScreen { showSplash = false }
     else {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
-        var var chromatogram by remember { by rememberSaveable { mutableStateOf<Chromatogram?>(null) }
-        var var fileName by remember { by rememberSaveable { mutableStateOf("No file loaded") }
-        var var isLoading by remember { by rememberSaveable { mutableStateOf(false) }
+        var chromatogram by remember { mutableStateOf<Chromatogram?>(null) }
+        var fileName by rememberSaveable { mutableStateOf("No file loaded") }
+        var isLoading by remember { mutableStateOf(false) }
 
-        val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             if (uri != null) {
                 isLoading = true
                 scope.launch {
