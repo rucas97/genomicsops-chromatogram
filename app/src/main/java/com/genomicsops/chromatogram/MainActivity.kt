@@ -9,6 +9,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -102,9 +106,21 @@ fun AppRoot() {
                     Surface(
                         color = GenomicsSurface, 
                         shape = RoundedCornerShape(8.dp), 
-                        modifier = Modifier.width(totalWidth).height(250.dp)
+                        modifier = Modifier.width(totalWidth).height(320.dp) // INCREASED HEIGHT
                     ) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
+                        Canvas(
+                            modifier = Modifier.fillMaxSize().pointerInput(bases, baseWidth) {
+                                detectTapGestures { offset ->
+                                    val pxPerBase = size.width.toFloat() / bases.length
+                                    val index = (offset.x / pxPerBase).toInt().coerceIn(0, bases.length - 1)
+                                    android.widget.Toast.makeText(
+                                        context, 
+                                        "Base: ${bases[index]}  |  Position: ${index + 1}", 
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        ) {
                             val maxVal = maxOf(
                                 chromatogram!!.traceA.maxOrNull() ?: 1,
                                 chromatogram!!.traceC.maxOrNull() ?: 1,
@@ -118,10 +134,20 @@ fun AppRoot() {
                                 // Map the trace points to the screen width
                                 for (i in trace.indices) {
                                     val x = (i.toFloat() / trace.size) * size.width
-                                    val y = size.height - ((trace[i] / maxVal) * size.height * 0.9f) - (size.height * 0.05f)
+                                    // ADDED VERTICAL PADDING so peaks don't touch top/bottom
+                                    val y = size.height - ((trace[i] / maxVal) * (size.height * 0.8f)) - (size.height * 0.1f)
                                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                                 }
-                                drawPath(path, color = color, style = Stroke(width = 2.5f))
+                                // ROUNDED CAPS AND JOINS FOR SMOOTHER CURVES
+                                drawPath(
+                                    path, 
+                                    color = color, 
+                                    style = Stroke(
+                                        width = 3f, 
+                                        cap = StrokeCap.Round, 
+                                        join = StrokeJoin.Round
+                                    )
+                                )
                             }
                             
                             // Draw the 4 traces
