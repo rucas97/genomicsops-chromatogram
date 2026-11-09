@@ -131,19 +131,35 @@ fun AppRoot() {
                             fun drawTrace(trace: IntArray, color: Color) {
                                 if (trace.isEmpty()) return
                                 val path = Path()
-                                // Map the trace points to the screen width
+                                
+                                // Apply a 5-point moving average to smooth the jagged raw data
+                                val smoothedTrace = IntArray(trace.size)
+                                val window = 5
                                 for (i in trace.indices) {
-                                    val x = (i.toFloat() / trace.size) * size.width
-                                    // ADDED VERTICAL PADDING so peaks don't touch top/bottom
-                                    val y = size.height - ((trace[i] / maxVal) * (size.height * 0.8f)) - (size.height * 0.1f)
+                                    var sum = 0
+                                    var count = 0
+                                    for (j in -window..window) {
+                                        val idx = i + j
+                                        if (idx in trace.indices) {
+                                            sum += trace[idx]
+                                            count++
+                                        }
+                                    }
+                                    smoothedTrace[i] = sum / count
+                                }
+
+                                // Map the smoothed points to the screen width
+                                for (i in smoothedTrace.indices) {
+                                    val x = (i.toFloat() / smoothedTrace.size) * size.width
+                                    val y = size.height - ((smoothedTrace[i] / maxVal) * (size.height * 0.8f)) - (size.height * 0.1f)
                                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                                 }
-                                // ROUNDED CAPS AND JOINS FOR SMOOTHER CURVES
+                                
                                 drawPath(
                                     path, 
                                     color = color, 
                                     style = Stroke(
-                                        width = 3f, 
+                                        width = 4f, // Thicker line for smoothness
                                         cap = StrokeCap.Round, 
                                         join = StrokeJoin.Round
                                     )
