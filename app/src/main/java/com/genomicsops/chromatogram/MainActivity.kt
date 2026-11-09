@@ -96,12 +96,23 @@ fun AppRoot() {
                             if (trace.isEmpty()) return
                             val path = Path()
                             val maxVal = trace.maxOrNull()?.toFloat() ?: 1f
-                            for (i in trace.indices) {
+                            
+                            // FIX: Downsample the data so we don't draw a solid block of lines
+                            val step = (trace.size / width).toInt().coerceAtLeast(1)
+                            
+                            for (i in 0 until trace.size step step) {
                                 val x = (i.toFloat() / trace.size) * width
-                                val y = height - ((trace[i] / maxVal) * height * 0.9f) - (height * 0.05f)
+                                val y = height - ((trace[i] / maxVal) * height * 0.8f) - (height * 0.1f)
+                                
                                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                             }
-                            drawPath(path, color = color, style = Stroke(width = 3f))
+                            
+                            // FIX: Use anti-aliasing and smoother strokes
+                            drawPath(
+                                path = path, 
+                                color = color, 
+                                style = Stroke(width = 2.5f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                            )
                         }
                         
                         drawTrace(cg.traceA, Color.Green)
