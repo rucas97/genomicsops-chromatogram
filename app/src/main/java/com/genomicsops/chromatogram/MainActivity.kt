@@ -59,7 +59,7 @@ fun AppRoot() {
                         } catch (e: Exception) { null }
                     }
                     if (parsed == null) {
-                        Toast.makeText(context, "Invalid or corrupted .ab1 file", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Invalid .ab1 file. Ensure it is a true ABIF binary file.", Toast.LENGTH_LONG).show()
                     } else {
                         chromatogram = parsed
                         fileName = uri.lastPathSegment?.substringAfterLast("/") ?: "Loaded .ab1"
