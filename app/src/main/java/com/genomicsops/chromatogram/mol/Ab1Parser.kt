@@ -18,68 +18,65 @@ object Ab1Parser {
             val bytes = inputStream.readBytes()
             val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
             
-            // 1. Read Header (128 bytes)
             val magic = ByteArray(4)
             buffer.get(magic)
             if (String(magic) != "ABIF") return null
             
             buffer.getShort() // version
             buffer.getInt() // unused
-            val dirOffset = buffer.getInt() // Directory offset
-            buffer.getInt() // unused
-            
-            // 2. Read Directory
-            buffer.position(dirOffset)
-            val entryCount = buffer.getInt()
+            val dirOffset = buffer.getInt() 
+            val entryCount = buffer.getInt() // FIX: Read count from header, not directory
             
             var bases = ""
-            var traceA = IntArray(0)
-            var traceC = IntArray(0)
-            var traceG = IntArray(0)
-            var traceT = IntArray(0)
+            val traces = mutableMapOf<Int, IntArray>()
 
-            val directory = mutableMapOf<String, Pair<Int, Int>>() 
-            
+            // Read directory entries
             for (i in 0 until entryCount) {
+                buffer.position(dirOffset + (i * 28)) // 28-byte entries
+                
                 val nameBytes = ByteArray(4)
                 buffer.get(nameBytes)
                 val name = String(nameBytes)
                 val tagNumber = buffer.getInt()
                 buffer.getShort() // element type
                 buffer.getShort() // element size
-                val dataLen = buffer.getInt() // number of elements
-                val dataSize = buffer.getInt() // total size in bytes
+                val numElements = buffer.getInt()
+                val dataSize = buffer.getInt()
                 val dataOffset = buffer.getInt()
-                buffer.getInt() // FIX: DataHandle (4 bytes, always 0) -> Makes entry 28 bytes!
-                
-                directory["$name$tagNumber"] = Pair(dataSize, dataOffset)
-            }
-            
-            // 3. Extract Base Calls (PBAS)
-            directory["PBAS9"]?.let { (size, offset) ->
-                buffer.position(offset)
-                val b = ByteArray(size)
-                buffer.get(b)
-                bases = String(b)
-            }
-            
-            // 4. Extract Traces (DATA)
-            fun getTrace(key: String): IntArray {
-                val (size, offset) = directory[key] ?: return IntArray(0)
-                buffer.position(offset)
-                val array = IntArray(size / 2) // Size is in bytes, each 'short' is 2 bytes
-                for (i in array.indices) {
-                    array[i] = buffer.getShort().toInt() and 0xFFFF
+                buffer.getInt() // data handle (unused)
+
+                // Rule: if dataSize <= 4, data is in the offset field itself
+                if (name == "PBAS" && tagNumber == 9) {
+                    if (dataSize <= 4) {
+                        val d = ByteBuffer.allocate(4).putInt(dataOffset).array()
+                        bases = String(d).substring(0, numElements)
+                    } else {
+                        buffer.position(dataOffset)
+                        val b = ByteArray(numElements)
+                        buffer.get(b)
+                        bases = String(b)
+                    }
+                } else if (name == "DATA" && tagNumber in 9..12) {
+                    val traceArray = IntArray(numElements)
+                    if (dataSize <= 4) {
+                        traceArray[0] = dataOffset
+                    } else {
+                        buffer.position(dataOffset)
+                        for (j in 0 until numElements) {
+                            traceArray[j] = buffer.getShort().toInt() and 0xFFFF
+                        }
+                    }
+                    traces[tagNumber] = traceArray
                 }
-                return array
             }
             
-            traceA = getTrace("DATA9")
-            traceC = getTrace("DATA10")
-            traceG = getTrace("DATA11")
-            traceT = getTrace("DATA12")
-            
-            return Chromatogram(bases, traceA, traceC, traceG, traceT)
+            return Chromatogram(
+                bases = bases,
+                traceA = traces[9] ?: IntArray(0),  // Often A
+                traceC = traces[10] ?: IntArray(0), // Often C
+                traceG = traces[11] ?: IntArray(0), // Often G
+                traceT = traces[12] ?: IntArray(0)  // Often T
+            )
         } catch (e: Exception) {
             e.printStackTrace()
             return null
