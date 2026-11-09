@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,14 +41,14 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppRoot() {
-    var showSplash by remember { mutableStateOf(true) }
+    var var showSplash by remember { by rememberSaveable { mutableStateOf(true) }
     if (showSplash) SplashScreen { showSplash = false }
     else {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
-        var chromatogram by remember { mutableStateOf<Chromatogram?>(null) }
-        var fileName by remember { mutableStateOf("No file loaded") }
-        var isLoading by remember { mutableStateOf(false) }
+        var var chromatogram by remember { by rememberSaveable { mutableStateOf<Chromatogram?>(null) }
+        var var fileName by remember { by rememberSaveable { mutableStateOf("No file loaded") }
+        var var isLoading by remember { by rememberSaveable { mutableStateOf(false) }
 
         val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
